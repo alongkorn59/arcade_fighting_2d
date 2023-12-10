@@ -11,7 +11,7 @@ public class IdleState : IState
     }
     public void UpdateState()
     {
-        if (controller.IsReplaying)
+        if (controller.IsReplaying || controller.IsDead)
             return;
         controller.BasicMovement();
         if (Input.GetKeyDown(InputFactory.GetKeyCode(controller.Player, ActionKey.Attack)))

@@ -61,4 +61,10 @@ public class UiManager : MonoBehaviour
         startGameButton.gameObject.SetActive(false);
     }
 
+    public void OnReplayEnd()
+    {
+        replayButton.gameObject.SetActive(true);
+        startGameButton.gameObject.SetActive(true);
+    }
+
 }

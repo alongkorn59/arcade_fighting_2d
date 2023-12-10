@@ -2,19 +2,25 @@
 using System.Collections;
 using System;
 
-public partial class PlayerController : MonoBehaviour
+public partial class PlayerControllerOld : MonoBehaviour
 {
+    private float gravity = -6f;
+    private float gravityMultiplier = -6f;
+
     private const float DASH_COOLDOWN = 2f;
 
     public PlayerType Player;
     [SerializeField] float speed = 4.0f;
     [SerializeField] float jumpForce = 7.5f;
+    private float _velocity;
+    private Vector3 velocity;
 
     private Animator animator;
     public Animator Animator => animator;
 
-    private Rigidbody2D body2d;
-    public Rigidbody2D Body2d => body2d;
+    [SerializeField] private CharacterController characterController; // เปลี่ยนจาก Rigidbody2D เป็น CharacterController
+    public CharacterController CharacterController => characterController;
+
     [SerializeField] private GroundChecker groundChecker;
     public bool IsGrounded = false;
     public bool IsDead = false;
@@ -58,6 +64,7 @@ public partial class PlayerController : MonoBehaviour
         string iconName = Player == PlayerType.Player1 ? "P1" : "P2";
         var image = Resources.Load<Sprite>($"Icon/{iconName}");
         IconPlayer.sprite = image;
+        // ChangeState(PlayerStateType.Idle);
     }
 
     void Start()
@@ -65,19 +72,17 @@ public partial class PlayerController : MonoBehaviour
         health.OnDead = OnDead;
         health.OnHealthUpdate += OnTakeDamage;
         animator = GetComponentInChildren<Animator>();
-        body2d = GetComponent<Rigidbody2D>();
-        hitBox.Init(this);
+        // characterController = GetComponent<CharacterController>(); // เปลี่ยนจาก Rigidbody2D เป็น CharacterController
         groundChecker = transform.Find("GroundSensor").GetComponentInChildren<GroundChecker>();
 
-        ChangeState(PlayerStateType.Idle);
-
-        //Check if character just started falling
+        // Check if character just started falling
         if (IsGrounded && !groundChecker.State())
         {
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
         }
     }
+
     public void ResetToStartPosition()
     {
         this.transform.position = startPosition;
@@ -90,43 +95,36 @@ public partial class PlayerController : MonoBehaviour
 
         IEnumerator DashProcess()
         {
-            float tempGravity = body2d.gravityScale;
-            body2d.gravityScale = 0;
+            // float tempGravity = characterController.gravity;
+            // characterController.ConfigureCharacterController(isKinematic: true, useGravity: false);
             IsDashing = true;
             isDashAble = false;
             health.gameObject.SetActive(false);
             animator.SetBool("Dashing", IsDashing);
             float dashDirection = transform.localScale.x;
 
-            body2d.velocity = Vector2.zero;
-
-            body2d.velocity = new Vector2(-dashDirection * speed * 2, body2d.velocity.y);
+            characterController.Move(new Vector3(-dashDirection * speed * 2, 0, 0));
 
             yield return new WaitForSeconds(dashDuration);
             animator.SetBool("Dashing", false);
             health.gameObject.SetActive(true);
-            body2d.velocity = Vector2.zero;
-            body2d.gravityScale = tempGravity;
+            // characterController.ConfigureCharacterController(isKinematic: false, useGravity: true);
             IsDashing = false;
+
             if (isDashAttack)
                 yield return StartCoroutine(DashAttackProcess());
-            ChangeState(PlayerStateType.Idle);
+
             yield return new WaitForSeconds(DASH_COOLDOWN);
             isDashAble = true;
-
         }
+
         IEnumerator DashAttackProcess()
         {
             Debug.Log("DashAttack");
             animator.SetTrigger("DashAttack");
             hitBox.ActiveDamage(12, 2);
-            // yield return new WaitForSeconds(0.2f);
-            body2d.velocity = Vector2.zero;
-            hitBox.gameObject.SetActive(true);
-            hitBox.ShakeObject();
             yield return new WaitForSeconds(0.5f);
             hitBox.gameObject.SetActive(false);
-            ChangeState(PlayerStateType.Idle);
         }
     }
 
@@ -147,7 +145,7 @@ public partial class PlayerController : MonoBehaviour
             blockVfx.SetActive(IsBlocking);
             health.gameObject.SetActive(!IsBlocking);
             animator.SetInteger("AnimState", (int)AnimState.Idle);
-            ChangeState(PlayerStateType.Idle);
+            // ChangeState(PlayerStateType.Idle);
         }
     }
 
@@ -168,29 +166,33 @@ public partial class PlayerController : MonoBehaviour
             yield return new WaitForSeconds(0.25f);
             hitBox.gameObject.SetActive(false);
             IsAttacking = false;
-            ChangeState(PlayerStateType.Idle);
+            // ChangeState(PlayerStateType.Idle);
         }
     }
 
     public void Hurt()
     {
+        // animator.SetInteger("AnimState", (int)AnimState.Idle);
         StartCoroutine(HurtProcess());
         IEnumerator HurtProcess()
         {
             animator.SetTrigger("Hurt");
             yield return new WaitForSeconds(0.2f);
-            ChangeState(PlayerStateType.Idle);
+            // ChangeState(PlayerStateType.Idle);
         }
     }
 
-    public void BasicMovement()
+    public void BasicMovement() //? Move Jump
     {
         if (IsReplaying || IsDead || IsAttacking || IsDashing || IsBlocking)
             return;
 
-        airSpeed = body2d.velocity.y;
+        airSpeed = characterController.velocity.y; // เปลี่ยนจาก body2d.velocity.y เป็น characterController.velocity.y
+
+        //Set AirSpeed in animator
         animator.SetFloat("AirSpeed", airSpeed);
 
+        //Check if character just landed on the ground
         if (!IsGrounded && groundChecker.State())
         {
             IsGrounded = true;
@@ -205,56 +207,69 @@ public partial class PlayerController : MonoBehaviour
         else if (inputX < 0)
             transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
 
-        FlipPlayer();
+        FlipIcon();
 
-        // Move using Translate
-        Vector3 movement = new Vector3(inputX * speed * Time.deltaTime, airSpeed * Time.deltaTime, 0f);
-        body2d.transform.Translate(movement);
+        // Move
+        if (IsGrounded || airSpeed > 0)
+            characterController.Move(new Vector3(inputX * speed, airSpeed, 0) * Time.deltaTime);
 
-        playerVelocity = body2d.velocity;
+        playerVelocity = characterController.velocity;
 
-        // Jump
+        //Jump
         if (Input.GetKeyDown(InputFactory.GetKeyCode(Player, ActionKey.Jump)) && IsGrounded && (!IsReplaying && !IsDead))
         {
             animator.SetTrigger("Jump");
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
-
-            // Use AddForce for the jump
-            body2d.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
-
+            characterController.Move(new Vector3(0, jumpForce, 0)); // เปลี่ยนจาก body2d.velocity.x, jumpForce เป็น characterController.Move(new Vector3(0, jumpForce, 0))
             groundChecker.Disable(0.2f);
         }
 
-        // Run
+        //Run
         if (Mathf.Abs(inputX) > Mathf.Epsilon)
             animator.SetInteger("AnimState", (int)AnimState.Run);
+
+        //Idle
         else
             animator.SetInteger("AnimState", (int)AnimState.Idle);
     }
 
-    private void FlipPlayer()
+    private void FlipIcon()
     {
-        if (inputX > 0)
-            transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
-        else if (inputX < 0)
-            transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
-
-        //? FlipPlayer Icon
         var x = this.transform.localScale.x;
         IconPlayer.transform.localScale = new Vector2(x * 0.2f, 0.2f);
     }
 
     void Update()
     {
-        playerState.UpdateState();
+        ApplyGravity();
+
+        // Apply gravity
+        if (characterController.isGrounded)
+        {
+            velocity.y = -0.5f; // reset vertical velocity if grounded
+            IsGrounded = true;
+        }
+        else
+        {
+            velocity.y += Physics.gravity.y * Time.deltaTime;
+            IsGrounded = false;
+        }
+        // playerState.UpdateState();
+    }
+    private void ApplyGravity()
+    {
+        _velocity += gravity * gravityMultiplier * Time.deltaTime;
+        // characterController.Move(_velocity);
     }
     private void OnTakeDamage(int currentHealth)
     {
-        ChangeState(PlayerStateType.Hurt);
+        Debug.Log($"{Player} TakeDamage");
+        // ChangeState(PlayerStateType.Hurt);
     }
     private void OnDead()
     {
+        Debug.Log($"{Player} Dead");
         IsDead = true;
         health.gameObject.SetActive(false);
         animator.SetTrigger("Death");
@@ -263,6 +278,7 @@ public partial class PlayerController : MonoBehaviour
     }
     public void Reset()
     {
+        Debug.Log($"{Player} Dead");
         IsDead = false;
         health.gameObject.SetActive(true);
         health.Reset();
@@ -291,59 +307,53 @@ public partial class PlayerController : MonoBehaviour
             Dash();
         }
     }
-    public void ApplyReplayMovement(float inputX, bool jump) //? Move Jump
+    public void ApplyReplayMovement(float inputX, bool jump)
     {
         if (IsAttacking || IsDashing || IsBlocking)
             return;
-        airSpeed = body2d.velocity.y;
+
+        // Set the player's position based on the recorded information
+        // transform.position = playerPosition;
+
+        airSpeed = characterController.velocity.y;
+
+        // Set AirSpeed in animator
         animator.SetFloat("AirSpeed", airSpeed);
 
+        // Check if the character just landed on the ground
         if (!IsGrounded && groundChecker.State())
         {
             IsGrounded = true;
             animator.SetBool("Grounded", IsGrounded);
         }
 
+        // Swap direction of the sprite depending on walk direction
+        if (inputX > 0)
+            transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
+        else if (inputX < 0)
+            transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
 
+        FlipIcon();
 
-        FlipPlayer();
-
-        // Move using Translate
-        Vector3 movement = new Vector3(inputX * speed * Time.deltaTime, airSpeed * Time.deltaTime, 0f);
-        body2d.transform.Translate(movement);
-
-        playerVelocity = body2d.velocity;
+        // Move
+        if (IsGrounded || airSpeed > 0)
+            characterController.Move(new Vector3(inputX * speed, airSpeed, 0) * Time.deltaTime);
 
         // Jump
-        if (jump && IsGrounded && (!IsReplaying && !IsDead))
+        if (jump && IsGrounded)
         {
             animator.SetTrigger("Jump");
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
-
-            // Use AddForce for the jump
-            body2d.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
-
+            characterController.Move(new Vector3(0, jumpForce, 0));
             groundChecker.Disable(0.2f);
         }
 
         // Run
         if (Mathf.Abs(inputX) > Mathf.Epsilon)
             animator.SetInteger("AnimState", (int)AnimState.Run);
+        // Idle
         else
             animator.SetInteger("AnimState", (int)AnimState.Idle);
     }
 }
-public enum PlayerType
-{
-    Player1,
-    Player2,
-}
-
-public enum AnimState : int
-{
-    Idle = 0,
-    Run = 1,
-    Block = 2,
-}
-

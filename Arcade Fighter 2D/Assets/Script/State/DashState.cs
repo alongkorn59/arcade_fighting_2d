@@ -14,7 +14,7 @@ public class DashState : IState
     }
     public void UpdateState()
     {
-        if (controller.IsReplaying)
+        if (controller.IsReplaying || controller.IsDead)
             return;
         if (Input.GetKeyDown(InputFactory.GetKeyCode(controller.Player, ActionKey.Attack)))
         {

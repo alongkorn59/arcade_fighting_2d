@@ -9,16 +9,15 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerController player1;
     [SerializeField] private PlayerController player2;
 
-    // Input records for Player 1 and Player 2
     [SerializeField] private List<InputRecord> player1InputRecords = new List<InputRecord>();
     [SerializeField] private List<InputRecord> player2InputRecords = new List<InputRecord>();
 
     private float gameStartTime;
     public bool isStopRecord = false;
+    private float recordInterval = 0.1f;
 
     private void Start()
     {
-        // Record the start time of the game
         gameStartTime = Time.time;
         player1.OnPlayerDead += OnPlayerDead;
         player2.OnPlayerDead += OnPlayerDead;
@@ -28,35 +27,39 @@ public class GameManager : MonoBehaviour
     {
         if (!isStopRecord)
         {
-            // Record input for Player 1
             RecordInput(PlayerType.Player1);
-
-            // Record input for Player 2
             RecordInput(PlayerType.Player2);
         }
     }
 
     private void RecordInput(PlayerType playerType)
     {
-        float horizontalInput = Input.GetAxis(InputFactory.GetInputAxisMovement(playerType));
-        bool jumpInput = Input.GetKey(InputFactory.GetKeyCode(playerType, ActionKey.Jump));
-        bool attackInput = Input.GetKey(InputFactory.GetKeyCode(playerType, ActionKey.Attack));
-        bool blockInput = Input.GetKey(InputFactory.GetKeyCode(playerType, ActionKey.Block));
-        bool skillInput = Input.GetKey(InputFactory.GetKeyCode(playerType, ActionKey.Skill));
-        bool dashInput = Input.GetKey(InputFactory.GetKeyCode(playerType, ActionKey.Dash));
+        float horizontalInput = Input.GetAxisRaw(InputFactory.GetInputAxisMovement(playerType));
+        bool jumpInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Jump));
+        bool attackInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Attack));
+        bool blockInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Block));
+        bool skillInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Skill));
+        bool dashInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Dash));
+
+        Vector2 playerPosition = transform.localPosition;
 
         // Check if any input is active before adding a new record
         if (horizontalInput != 0 || jumpInput || attackInput || blockInput || skillInput || dashInput)
         {
+            // Calculate fixed timestamp based on the interval
+            float timestamp = Time.time - gameStartTime;
+            timestamp = Mathf.Floor(timestamp / recordInterval) * recordInterval;
+
             InputRecord inputRecord = new InputRecord
             {
-                timestamp = Time.time - gameStartTime,
+                timestamp = timestamp,
                 horizontalInput = horizontalInput,
                 jumpInput = jumpInput,
                 attackInput = attackInput,
                 blockInput = blockInput,
                 skillInput = skillInput,
-                dashInput = dashInput
+                dashInput = dashInput,
+                playerPosition = playerPosition  // Record player position
             };
 
             if (playerType == PlayerType.Player1)
@@ -103,53 +106,56 @@ public class GameManager : MonoBehaviour
         StartCoroutine(ReplayInputsCoroutine());
     }
 
+    bool isReplayEnd1 = false;
+    bool isReplayEnd2 = false;
+    bool isAllReplayEnd => isReplayEnd1 && isReplayEnd2;
     private IEnumerator ReplayInputsCoroutine()
     {
         // Replay input for Player 1
         StartCoroutine(ReplayPlayerInputs(player1InputRecords, PlayerType.Player1));
-
         // Replay input for Player 2
         StartCoroutine(ReplayPlayerInputs(player2InputRecords, PlayerType.Player2));
-        yield return new WaitForEndOfFrame();
-    }
+        yield return new WaitUntil(() => isAllReplayEnd);
+        player1.IsReplaying = false;
+        player2.IsReplaying = false;
+        isReplayEnd1 = false;
+        isReplayEnd2 = false;
 
-    private IEnumerator ReplayPlayerInputs(List<InputRecord> inputRecords, PlayerType playerType)
+    }
+    IEnumerator ReplayPlayerInputs(List<InputRecord> inputRecords, PlayerType playerType)
     {
         float startTime = Time.time;
 
         foreach (InputRecord inputRecord in inputRecords)
         {
-            // Adjust the timestamp based on the time elapsed since the start of the game
             float adjustedTimestamp = startTime + inputRecord.timestamp;
 
-            // Wait until it's time to apply the input
             yield return new WaitForSeconds(adjustedTimestamp - Time.time);
 
-            // Apply the replayed input to the corresponding player
             ApplyReplayedInput(playerType, inputRecord);
-
-            // Optionally, you can use this time to simulate the game state based on the replayed input
         }
+        if (playerType == PlayerType.Player1)
+            isReplayEnd1 = true;
+        else
+            isReplayEnd2 = true;
     }
+
+
 
     private void ApplyReplayedInput(PlayerType playerType, InputRecord inputRecord)
     {
-        // Retrieve the appropriate PlayerController based on playerType
         PlayerController playerController = GetPlayerController(playerType);
 
         if (playerController != null)
         {
             // Apply the replayed input to the player controller
-            playerController.ApplyInput(inputRecord.horizontalInput, inputRecord.jumpInput, inputRecord.attackInput, inputRecord.blockInput, inputRecord.skillInput, inputRecord.dashInput);
+            playerController.ApplyReplayMovement(inputRecord.horizontalInput, inputRecord.jumpInput);
+            playerController.ApplyReplayInput(inputRecord.attackInput, inputRecord.blockInput, inputRecord.skillInput, inputRecord.dashInput, inputRecord.playerPosition);
         }
     }
 
     private PlayerController GetPlayerController(PlayerType playerType)
     {
-        // You need to implement logic to get the correct PlayerController based on playerType
-        // This might involve finding the corresponding GameObject or using some other mechanism
-        // For example, assuming each player has a PlayerController component on their GameObject:
-
         return playerType == PlayerType.Player1 ? player1 : player2;
     }
 
@@ -169,4 +175,5 @@ public class InputRecord
     public bool blockInput;
     public bool skillInput;
     public bool dashInput;
+    public Vector2 playerPosition;
 }
