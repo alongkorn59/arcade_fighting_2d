@@ -13,7 +13,7 @@ public class Health : MonoBehaviour
     public Action OnDead;
     public Action<int> OnHealthUpdate;
 
-    
+
     void Awake()
     {
         Reset();
@@ -28,6 +28,14 @@ public class Health : MonoBehaviour
         {
             OnDead?.Invoke();
         }
+    }
+    public void SetForceDead()
+    {
+        if (currentHealth == 0)
+            return;
+        currentHealth = 0;
+        OnHealthUpdate?.Invoke(currentHealth);
+        OnDead?.Invoke();
     }
     public void Reset()
     {

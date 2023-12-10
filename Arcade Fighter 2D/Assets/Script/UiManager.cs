@@ -6,65 +6,70 @@ using UnityEngine.UI;
 public class UiManager : MonoBehaviour
 {
     [SerializeField] private PlayerHealthBar playerHealthBar;
+    [SerializeField] private GameObject startGamePanel;
+    [SerializeField] private GameObject endGamePanel;
+
     [SerializeField] private Button resetButton;
-    [SerializeField] private Button startGameButton;
+    [SerializeField] private Button startNewButton;
     [SerializeField] private Button replayButton;
+    [SerializeField] private Button startButton;
 
-    [SerializeField] private PlayerController player1;
-    [SerializeField] private PlayerController player2;
+    private GameManager gameManager;
 
-    [SerializeField] private GameManager gameManager;
-
+    public void Init(GameManager gameManager)
+    {
+        this.gameManager = gameManager;
+    }
 
     void Start()
     {
-        resetButton.onClick.AddListener(OnResetGame);
-        startGameButton.onClick.AddListener(OnStartNewGame);
+        startNewButton.onClick.AddListener(OnStartNewGame);
         replayButton.onClick.AddListener(OnReplayPreviousGame);
+        startButton.onClick.AddListener(OnStartGame);
     }
 
     private void OnResetGame()
     {
         gameManager.ResetPlayer();
-        resetButton.gameObject.SetActive(false);
-        replayButton.gameObject.SetActive(true);
-        startGameButton.gameObject.SetActive(true);
     }
 
     private void OnStartNewGame()
     {
         gameManager.Reset();
-        replayButton.gameObject.SetActive(false);
-        startGameButton.gameObject.SetActive(false);
+        gameManager.StartGame();
+        ShowEndGameUi(false);
     }
 
     private void OnReplayPreviousGame()
     {
-        gameManager.ResetPlayer();
-        replayButton.gameObject.SetActive(false);
-        startGameButton.gameObject.SetActive(false);
-        gameManager.ReplayAllInputs();
-
-    }
-
-    private void OnDestroy()
-    {
-        resetButton.onClick.RemoveListener(OnResetGame);
-        startGameButton.onClick.RemoveListener(OnStartNewGame);
-        replayButton.onClick.RemoveListener(OnReplayPreviousGame);
+        gameManager.ReplayAllEvent();
+        ShowEndGameUi(false);
     }
 
     public void OnEndGame()
     {
-        resetButton.gameObject.SetActive(true);
-        replayButton.gameObject.SetActive(false);
-        startGameButton.gameObject.SetActive(false);
+        ShowEndGameUi(true);
     }
 
-    public void OnReplayEnd()
+    public void OnStartGame()
     {
-        replayButton.gameObject.SetActive(true);
-        startGameButton.gameObject.SetActive(true);
+        gameManager.StartGame();
+        HideStartUi();
+    }
+
+    private void HideStartUi()
+    {
+        startGamePanel.SetActive(false);
+    }
+    private void ShowEndGameUi(bool isShow)
+    {
+        endGamePanel.SetActive(isShow);
+    }
+
+    private void OnDestroy()
+    {
+        startNewButton.onClick.RemoveListener(OnStartNewGame);
+        replayButton.onClick.RemoveListener(OnReplayPreviousGame);
     }
 
 }

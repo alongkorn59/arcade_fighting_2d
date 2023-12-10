@@ -7,17 +7,31 @@ public class GameManager : MonoBehaviour
 {
     [SerializeField] private UiManager uiManager;
     [SerializeField] private PlayerController player1;
+    public PlayerController Player1 => player1;
     [SerializeField] private PlayerController player2;
+    public PlayerController Player2 => player2;
 
     [SerializeField] private List<InputRecord> player1InputRecords = new List<InputRecord>();
     [SerializeField] private List<InputRecord> player2InputRecords = new List<InputRecord>();
 
+    [SerializeField] private DeadRecord deadRecord;
+
     private float gameStartTime;
-    public bool isStopRecord = false;
+    private bool isStopRecord = true;
     private float recordInterval = 0.1f;
 
+    public bool isReplaying = false;
+    private bool isGameStarted = false;
+    public void StartGame()
+    {
+        isGameStarted = true;
+        player1.isGameStart = isGameStarted;
+        player2.isGameStart = isGameStarted;
+        isStopRecord = false;
+    }
     private void Start()
     {
+        uiManager.Init(this);
         gameStartTime = Time.time;
         player1.OnPlayerDead += OnPlayerDead;
         player2.OnPlayerDead += OnPlayerDead;
@@ -32,21 +46,23 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void RecordInput(PlayerType playerType)
+    public void RecordInput(PlayerType playerType)
     {
         float horizontalInput = Input.GetAxisRaw(InputFactory.GetInputAxisMovement(playerType));
         bool jumpInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Jump));
         bool attackInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Attack));
         bool blockInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Block));
-        bool skillInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Skill));
         bool dashInput = Input.GetKeyDown(InputFactory.GetKeyCode(playerType, ActionKey.Dash));
 
-        Vector2 playerPosition = transform.localPosition;
 
-        // Check if any input is active before adding a new record
-        if (horizontalInput != 0 || jumpInput || attackInput || blockInput || skillInput || dashInput)
+        Vector2 playerPosition;
+        if (playerType == PlayerType.Player1)
+            playerPosition = player1.transform.position;
+        else
+            playerPosition = player2.transform.position;
+
+        if (horizontalInput != 0 || jumpInput || attackInput || blockInput || dashInput)
         {
-            // Calculate fixed timestamp based on the interval
             float timestamp = Time.time - gameStartTime;
             timestamp = Mathf.Floor(timestamp / recordInterval) * recordInterval;
 
@@ -57,7 +73,6 @@ public class GameManager : MonoBehaviour
                 jumpInput = jumpInput,
                 attackInput = attackInput,
                 blockInput = blockInput,
-                skillInput = skillInput,
                 dashInput = dashInput,
                 playerPosition = playerPosition  // Record player position
             };
@@ -71,16 +86,6 @@ public class GameManager : MonoBehaviour
                 player2InputRecords.Add(inputRecord);
             }
         }
-    }
-
-    public List<InputRecord> GetPlayer1InputRecords()
-    {
-        return player1InputRecords;
-    }
-
-    public List<InputRecord> GetPlayer2InputRecords()
-    {
-        return player2InputRecords;
     }
 
     public void Reset()
@@ -97,7 +102,7 @@ public class GameManager : MonoBehaviour
         player1.Reset();
         player2.Reset();
     }
-    public void ReplayAllInputs()
+    public void ReplayAllEvent()
     {
         player1.Reset();
         player2.Reset();
@@ -109,12 +114,15 @@ public class GameManager : MonoBehaviour
     bool isReplayEnd1 = false;
     bool isReplayEnd2 = false;
     bool isAllReplayEnd => isReplayEnd1 && isReplayEnd2;
+
     private IEnumerator ReplayInputsCoroutine()
     {
+        isReplaying = true;
         // Replay input for Player 1
         StartCoroutine(ReplayPlayerInputs(player1InputRecords, PlayerType.Player1));
         // Replay input for Player 2
         StartCoroutine(ReplayPlayerInputs(player2InputRecords, PlayerType.Player2));
+        yield return StartCoroutine(ReplayHpUpdate(deadRecord));
         yield return new WaitUntil(() => isAllReplayEnd);
         player1.IsReplaying = false;
         player2.IsReplaying = false;
@@ -140,7 +148,14 @@ public class GameManager : MonoBehaviour
             isReplayEnd2 = true;
     }
 
-
+    IEnumerator ReplayHpUpdate(DeadRecord deadRecord)
+    {
+        float startTime = Time.time;
+        float adjustedTimestamp = startTime + deadRecord.timestamp;
+        yield return new WaitForSeconds(adjustedTimestamp - Time.time);
+        PlayerController playerController = GetPlayerController(deadRecord.playerType);
+        playerController.ApplyReplayDead();
+    }
 
     private void ApplyReplayedInput(PlayerType playerType, InputRecord inputRecord)
     {
@@ -150,7 +165,7 @@ public class GameManager : MonoBehaviour
         {
             // Apply the replayed input to the player controller
             playerController.ApplyReplayMovement(inputRecord.horizontalInput, inputRecord.jumpInput);
-            playerController.ApplyReplayInput(inputRecord.attackInput, inputRecord.blockInput, inputRecord.skillInput, inputRecord.dashInput, inputRecord.playerPosition);
+            playerController.ApplyReplayInput(inputRecord.attackInput, inputRecord.blockInput, inputRecord.dashInput, inputRecord.playerPosition);
         }
     }
 
@@ -159,12 +174,27 @@ public class GameManager : MonoBehaviour
         return playerType == PlayerType.Player1 ? player1 : player2;
     }
 
-    private void OnPlayerDead()
+    private void OnPlayerDead(PlayerType player)
     {
+        if (!isReplaying)
+        {
+            float timestamp = Time.time - gameStartTime;
+            timestamp = Mathf.Floor(timestamp / recordInterval) * recordInterval;
+            deadRecord = new DeadRecord(player, timestamp);
+        }
+        StartCoroutine(DelayEndGame());
+    }
+
+    IEnumerator DelayEndGame()
+    {
+        yield return new WaitForSeconds(3f);
         isStopRecord = true;
+        player1.isGameStart = false;
+        player2.isGameStart = false;
         uiManager.OnEndGame();
     }
 }
+
 [Serializable]
 public class InputRecord
 {
@@ -173,7 +203,17 @@ public class InputRecord
     public bool jumpInput;
     public bool attackInput;
     public bool blockInput;
-    public bool skillInput;
     public bool dashInput;
     public Vector2 playerPosition;
+}
+
+public class DeadRecord
+{
+    public PlayerType playerType;
+    public float timestamp;
+    public DeadRecord(PlayerType playerType, float timestamp)
+    {
+        this.playerType = playerType;
+        this.timestamp = timestamp;
+    }
 }

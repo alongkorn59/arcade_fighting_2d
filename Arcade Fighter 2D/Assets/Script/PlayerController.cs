@@ -49,8 +49,8 @@ public partial class PlayerController : MonoBehaviour
     private Vector2 startPosition;
     public bool IsReplaying = false;
 
-    public Action OnPlayerDead;
-
+    public Action<PlayerType> OnPlayerDead;
+    public bool isGameStart = false;
 
     private void Awake()
     {
@@ -71,7 +71,6 @@ public partial class PlayerController : MonoBehaviour
 
         ChangeState(PlayerStateType.Idle);
 
-        //Check if character just started falling
         if (IsGrounded && !groundChecker.State())
         {
             IsGrounded = false;
@@ -85,6 +84,7 @@ public partial class PlayerController : MonoBehaviour
 
     public void Dash()
     {
+        
         if (!IsDashing && isDashAble)
             StartCoroutine(DashProcess());
 
@@ -117,9 +117,8 @@ public partial class PlayerController : MonoBehaviour
         }
         IEnumerator DashAttackProcess()
         {
-            Debug.Log("DashAttack");
             animator.SetTrigger("DashAttack");
-            hitBox.ActiveDamage(12, 2);
+            hitBox.ActiveDamage(20, 2);
             // yield return new WaitForSeconds(0.2f);
             body2d.velocity = Vector2.zero;
             hitBox.gameObject.SetActive(true);
@@ -132,6 +131,7 @@ public partial class PlayerController : MonoBehaviour
 
     public void Block()
     {
+        
         if (!IsBlocking)
         {
             StartCoroutine(BlockProcess());
@@ -153,7 +153,6 @@ public partial class PlayerController : MonoBehaviour
 
     public void Attack()
     {
-        // animator.SetInteger("AnimState", (int)AnimState.Idle);
         if (!IsAttacking)
             StartCoroutine(AttackProcess());
 
@@ -161,7 +160,7 @@ public partial class PlayerController : MonoBehaviour
         {
             IsAttacking = true;
             animator.SetTrigger("Attack");
-            hitBox.ActiveDamage(6, 1);
+            hitBox.ActiveDamage(10, 1);
             yield return new WaitForSeconds(0.25f);
             hitBox.gameObject.SetActive(true);
             hitBox.ShakeObject();
@@ -197,7 +196,7 @@ public partial class PlayerController : MonoBehaviour
             animator.SetBool("Grounded", IsGrounded);
         }
 
-        inputX = Input.GetAxis(InputFactory.GetInputAxisMovement(Player));
+        inputX = Input.GetAxisRaw(InputFactory.GetInputAxisMovement(Player));
 
         // Swap direction of sprite depending on walk direction
         if (inputX > 0)
@@ -205,7 +204,7 @@ public partial class PlayerController : MonoBehaviour
         else if (inputX < 0)
             transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
 
-        FlipPlayer();
+        FlipIcon();
 
         // Move using Translate
         Vector3 movement = new Vector3(inputX * speed * Time.deltaTime, airSpeed * Time.deltaTime, 0f);
@@ -220,7 +219,6 @@ public partial class PlayerController : MonoBehaviour
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
 
-            // Use AddForce for the jump
             body2d.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
 
             groundChecker.Disable(0.2f);
@@ -233,21 +231,15 @@ public partial class PlayerController : MonoBehaviour
             animator.SetInteger("AnimState", (int)AnimState.Idle);
     }
 
-    private void FlipPlayer()
+    private void FlipIcon()
     {
-        if (inputX > 0)
-            transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
-        else if (inputX < 0)
-            transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
-
-        //? FlipPlayer Icon
         var x = this.transform.localScale.x;
         IconPlayer.transform.localScale = new Vector2(x * 0.2f, 0.2f);
     }
-
     void Update()
     {
-        playerState.UpdateState();
+        if (isGameStart)
+            playerState.UpdateState();
     }
     private void OnTakeDamage(int currentHealth)
     {
@@ -259,7 +251,7 @@ public partial class PlayerController : MonoBehaviour
         health.gameObject.SetActive(false);
         animator.SetTrigger("Death");
         animator.SetBool("Dead", true);
-        OnPlayerDead?.Invoke();
+        OnPlayerDead?.Invoke(Player);
     }
     public void Reset()
     {
@@ -270,29 +262,25 @@ public partial class PlayerController : MonoBehaviour
         animator.SetBool("Dead", false);
         ResetToStartPosition();
     }
-
-    public void ApplyReplayInput(bool attackInput, bool blockInput, bool skillInput, bool dashInput, Vector2 playerPosition)
+    public void ApplyReplayDead()
     {
-        // Handle attacking
-        if (attackInput)
-        {
-            Attack();
-        }
-
-        // Handle blocking
-        if (blockInput)
-        {
-            Block();
-        }
-
-        // Handle dashing
-        if (dashInput)
-        {
-            Dash();
-        }
+        health.SetForceDead();
     }
+
+    public void ApplyReplayInput(bool attackInput, bool blockInput, bool dashInput, Vector2 playerPosition)
+    {
+        this.transform.position = playerPosition;
+        if (attackInput)
+            Attack();
+        if (blockInput)
+            Block();
+        if (dashInput)
+            Dash();
+    }
+
     public void ApplyReplayMovement(float inputX, bool jump) //? Move Jump
     {
+        if (jump)
         if (IsAttacking || IsDashing || IsBlocking)
             return;
         airSpeed = body2d.velocity.y;
@@ -303,30 +291,29 @@ public partial class PlayerController : MonoBehaviour
             IsGrounded = true;
             animator.SetBool("Grounded", IsGrounded);
         }
+        if (inputX > 0)
+            transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
+        else if (inputX < 0)
+            transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
 
+        FlipIcon();
 
-
-        FlipPlayer();
-
-        // Move using Translate
         Vector3 movement = new Vector3(inputX * speed * Time.deltaTime, airSpeed * Time.deltaTime, 0f);
         body2d.transform.Translate(movement);
 
         playerVelocity = body2d.velocity;
 
         // Jump
-        if (jump && IsGrounded && (!IsReplaying && !IsDead))
+        if (jump && IsGrounded && !IsDead)
         {
             animator.SetTrigger("Jump");
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
 
-            // Use AddForce for the jump
             body2d.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
 
             groundChecker.Disable(0.2f);
         }
-
         // Run
         if (Mathf.Abs(inputX) > Mathf.Epsilon)
             animator.SetInteger("AnimState", (int)AnimState.Run);

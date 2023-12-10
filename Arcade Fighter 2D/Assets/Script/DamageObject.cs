@@ -27,9 +27,7 @@ public class DamageObject : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log("OnTriggerEnter = " + other);
         var health = other.GetComponent<Health>();
-        Debug.Log("health == " + health);
         if (health)
         {
             StartCoroutine(NockBackProcess(health.gameObject));

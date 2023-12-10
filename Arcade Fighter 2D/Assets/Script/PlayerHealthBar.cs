@@ -22,12 +22,10 @@ public class PlayerHealthBar : MonoBehaviour
 
     private void UpdateCurrentHealth1(int currentHealth)
     {
-        Debug.Log("UpdateCurrentHealth1 == " + currentHealth);
         healthBar1.value = currentHealth;
     }
     private void UpdateCurrentHealth2(int currentHealth)
     {
-        Debug.Log("UpdateCurrentHealth2 == " + currentHealth);
         healthBar2.value = currentHealth;
     }
 }
