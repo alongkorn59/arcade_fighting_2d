@@ -14,10 +14,10 @@ public static class InputFactory
                 return playerType == PlayerType.Player1 ? KeyCode.Space : KeyCode.Keypad0;
             case ActionKey.Block:
                 return playerType == PlayerType.Player1 ? KeyCode.J : KeyCode.Keypad1;
-            case ActionKey.Skill:
-                return playerType == PlayerType.Player1 ? KeyCode.L : KeyCode.Keypad3;
             case ActionKey.Dash:
                 return playerType == PlayerType.Player1 ? KeyCode.LeftShift : KeyCode.KeypadPeriod;
+            // case ActionKey.Skill:
+            //     return playerType == PlayerType.Player1 ? KeyCode.L : KeyCode.Keypad3;
             default:
                 return KeyCode.Keypad3;
         }
