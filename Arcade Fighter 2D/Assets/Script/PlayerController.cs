@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System;
 
 public partial class PlayerController : MonoBehaviour
 {
@@ -42,10 +43,15 @@ public partial class PlayerController : MonoBehaviour
     [SerializeField] private Health health;
     public Health Health => health;
     [SerializeField] private SpriteRenderer IconPlayer;
+    private Vector2 startPosition;
+    public bool IsReplaying = false;
+
+    public Action OnPlayerDead;
 
 
     private void Awake()
     {
+        startPosition = this.transform.position;
         string iconName = Player == PlayerType.Player1 ? "P1" : "P2";
         var image = Resources.Load<Sprite>($"Icon/{iconName}");
         IconPlayer.sprite = image;
@@ -68,6 +74,10 @@ public partial class PlayerController : MonoBehaviour
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
         }
+    }
+    public void ResetToStartPosition()
+    {
+        this.transform.position = startPosition;
     }
 
     public void Dash()
@@ -109,6 +119,7 @@ public partial class PlayerController : MonoBehaviour
             yield return new WaitForSeconds(0.2f);
             body2d.velocity = Vector2.zero;
             hitBox.gameObject.SetActive(true);
+            hitBox.ShakeObject();
             yield return new WaitForSeconds(0.5f);
             hitBox.gameObject.SetActive(false);
             ChangeState(PlayerStateType.Idle);
@@ -146,6 +157,7 @@ public partial class PlayerController : MonoBehaviour
             hitBox.ActiveDamage(6, 1);
             yield return new WaitForSeconds(0.25f);
             hitBox.gameObject.SetActive(true);
+            hitBox.ShakeObject();
             yield return new WaitForSeconds(0.25f);
             hitBox.gameObject.SetActive(false);
             ChangeState(PlayerStateType.Idle);
@@ -166,6 +178,8 @@ public partial class PlayerController : MonoBehaviour
 
     public void BasicMovement() //? Move Jump
     {
+        if (IsReplaying)
+            return;
         airSpeed = body2d.velocity.y;
 
         //Set AirSpeed in animator
@@ -191,7 +205,52 @@ public partial class PlayerController : MonoBehaviour
 
 
         //Jump
-        if (Input.GetKeyDown(InputFactory.GetKeyCode(Player, ActionKey.Jump)) && IsGrounded)
+        if (Input.GetKeyDown(InputFactory.GetKeyCode(Player, ActionKey.Jump)) && IsGrounded && !IsReplaying)
+        {
+            animator.SetTrigger("Jump");
+            IsGrounded = false;
+            animator.SetBool("Grounded", IsGrounded);
+            body2d.velocity = new Vector2(body2d.velocity.x, jumpForce);
+            groundChecker.Disable(0.2f);
+        }
+
+        //Run
+        if (Mathf.Abs(inputX) > Mathf.Epsilon)
+            animator.SetInteger("AnimState", (int)AnimState.Run);
+
+        //Idle
+        else
+            animator.SetInteger("AnimState", (int)AnimState.Idle);
+
+    }
+    public void ApplyReplayMovement(float inputX, bool jump) //? Move Jump
+    {
+        airSpeed = body2d.velocity.y;
+
+        //Set AirSpeed in animator
+        animator.SetFloat("AirSpeed", airSpeed);
+
+        //Check if character just landed on the ground
+        if (!IsGrounded && groundChecker.State())
+        {
+            IsGrounded = true;
+            animator.SetBool("Grounded", IsGrounded);
+        }
+
+        // inputX = Input.GetAxis(InputFactory.GetInputAxisMovement(Player));
+        // Swap direction of sprite depending on walk direction
+        if (inputX > 0)
+            transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
+        else if (inputX < 0)
+            transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
+        FlipIcon();
+        // Move
+        if (IsGrounded || airSpeed > 0)
+            body2d.velocity = new Vector2(inputX * speed, airSpeed);
+
+
+        //Jump
+        if (jump && IsGrounded)
         {
             animator.SetTrigger("Jump");
             IsGrounded = false;
@@ -227,6 +286,50 @@ public partial class PlayerController : MonoBehaviour
     private void OnDead()
     {
         Debug.Log($"{Player} Dead");
+        isDead = true;
+        health.gameObject.SetActive(false);
+        animator.SetTrigger("Death");
+        animator.SetBool("Dead", true);
+        OnPlayerDead?.Invoke();
+    }
+    public void Reset()
+    {
+        Debug.Log($"{Player} Dead");
+        isDead = false;
+        health.gameObject.SetActive(true);
+        health.Reset();
+        animator.SetTrigger("Recover");
+        animator.SetBool("Dead", false);
+        ResetToStartPosition();
+    }
+    public void ApplyInput(float horizontalInput, bool jumpInput, bool attackInput, bool blockInput, bool skillInput, bool dashInput)
+    {
+        // Handle horizontal movement
+        ApplyReplayMovement(horizontalInput, jumpInput);
+
+        // Handle attacking
+        if (attackInput)
+        {
+            Attack();
+        }
+
+        // Handle blocking
+        if (blockInput)
+        {
+            Block();
+        }
+
+        // // Handle using a skill (customize this based on your game)
+        // if (skillInput)
+        // {
+        //     UseSkill();
+        // }
+
+        // Handle dashing
+        if (dashInput)
+        {
+            Dash();
+        }
     }
 }
 public enum PlayerType
@@ -242,53 +345,3 @@ public enum AnimState : int
     Block = 2,
 }
 
-// void Update()
-// {
-
-// airSpeed = body2d.velocity.y;
-
-// //Set AirSpeed in animator
-// animator.SetFloat("AirSpeed", airSpeed);
-
-// //Check if character just landed on the ground
-// if (!IsGrounded && groundChecker.State())
-// {
-//     IsGrounded = true;
-//     animator.SetBool("Grounded", IsGrounded);
-// }
-
-// -- Handle input and movement --
-// Move();
-
-
-
-//TODO -----------------------------------------------------
-// -- Handle Animations --
-//Death
-// if (Input.GetKeyDown("e"))
-// {
-//     if (!isDead)
-//         animator.SetTrigger("Death");
-//     else
-//         animator.SetTrigger("Recover");
-
-//     isDead = !isDead;
-// }
-
-//Hurt
-// else if (Input.GetKeyDown("q"))
-//     animator.SetTrigger("Hurt");
-//TODO -----------------------------------------------------
-
-//Attack
-// if (Input.GetKeyDown(KeyCode.Space))
-// {
-//     ChangeState(PlayerStateType.Attack);
-// }
-
-//Block
-// if (Input.GetKey("f"))
-// {
-//     ChangeState(PlayerStateType.Block);
-// }
-// }

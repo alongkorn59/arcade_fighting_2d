@@ -8,6 +8,12 @@ public class DamageObject : MonoBehaviour
     [SerializeField] private int nockBackForce = 0;
     private PlayerController controller;
 
+    private Vector3 originalPosition;
+    private void Awake()
+    {
+        originalPosition = transform.localPosition;
+    }
+
     public void Init(PlayerController controller)
     {
         this.controller = controller;
@@ -43,6 +49,28 @@ public class DamageObject : MonoBehaviour
         targetController.Body2d.velocity = new Vector2(-direction * nockBackForce * 2, targetController.Body2d.velocity.y);
         yield return new WaitForSeconds(0.2f);
         targetController.Body2d.velocity = Vector2.zero;
+    }
+
+    public void ShakeObject()
+    {
+        StartCoroutine(Shake(3, 0.1f));
+    }
+
+    private IEnumerator Shake(int amount, float magnitude)
+    {
+        while (amount > 0)
+        {
+            float x = originalPosition.x + (UnityEngine.Random.Range(-1f, 1f) * magnitude);
+            // float y = originalPosition.y + UnityEngine.Random.Range(-1f, 1f) * magnitude;
+
+            transform.localPosition = new Vector3(x, originalPosition.y, originalPosition.z);
+
+            amount -= 1;
+
+            yield return new WaitForSeconds(0.01f);
+        }
+
+        transform.localPosition = originalPosition;
     }
 
 }
