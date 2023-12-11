@@ -5,14 +5,15 @@ using UnityEngine.UI;
 
 public class UiManager : MonoBehaviour
 {
-    [SerializeField] private PlayerHealthBar playerHealthBar;
+    [SerializeField] private FollowCamera followCamera;
     [SerializeField] private GameObject startGamePanel;
     [SerializeField] private GameObject endGamePanel;
+    [SerializeField] private GameObject replayPanel;
 
-    [SerializeField] private Button resetButton;
     [SerializeField] private Button startNewButton;
     [SerializeField] private Button replayButton;
     [SerializeField] private Button startButton;
+    [SerializeField] private Button switchCameraButton;
 
     private GameManager gameManager;
 
@@ -26,6 +27,7 @@ public class UiManager : MonoBehaviour
         startNewButton.onClick.AddListener(OnStartNewGame);
         replayButton.onClick.AddListener(OnReplayPreviousGame);
         startButton.onClick.AddListener(OnStartGame);
+        switchCameraButton.onClick.AddListener(OnSwitchCamera);
     }
 
     private void OnResetGame()
@@ -44,11 +46,16 @@ public class UiManager : MonoBehaviour
     {
         gameManager.ReplayAllEvent();
         ShowEndGameUi(false);
+        replayPanel.SetActive(true);
+        followCamera.FocusIndex = 0;
+        followCamera.StartFocusing();
     }
 
     public void OnEndGame()
     {
         ShowEndGameUi(true);
+        replayPanel.SetActive(false);
+        StopFocusing();
     }
 
     public void OnStartGame()
@@ -70,6 +77,16 @@ public class UiManager : MonoBehaviour
     {
         startNewButton.onClick.RemoveListener(OnStartNewGame);
         replayButton.onClick.RemoveListener(OnReplayPreviousGame);
+    }
+
+    private void OnSwitchCamera()
+    {
+        followCamera.SwitchTarget();
+    }
+
+    public void StopFocusing()
+    {
+        followCamera.StopFocusing();
     }
 
 }
