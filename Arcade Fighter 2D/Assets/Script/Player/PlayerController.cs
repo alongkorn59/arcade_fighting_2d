@@ -52,6 +52,8 @@ public partial class PlayerController : MonoBehaviour
     public Action<PlayerType> OnPlayerDead;
     public bool isGameStart = false;
     private Coroutine idleReplay;
+    [SerializeField] private SoundController soundController;
+    public SoundController SoundController => soundController;
 
     private void Awake()
     {
@@ -91,6 +93,7 @@ public partial class PlayerController : MonoBehaviour
 
         IEnumerator DashProcess()
         {
+            soundController.PlaySound(SoundType.Dash);
             float tempGravity = body2d.gravityScale;
             body2d.gravityScale = 0;
             IsDashing = true;
@@ -118,6 +121,7 @@ public partial class PlayerController : MonoBehaviour
         }
         IEnumerator DashAttackProcess()
         {
+            soundController.PlaySound(SoundType.Attack);
             animator.SetTrigger("DashAttack");
             hitBox.ActiveDamage(20, 2);
             // yield return new WaitForSeconds(0.2f);
@@ -139,6 +143,7 @@ public partial class PlayerController : MonoBehaviour
         }
         IEnumerator BlockProcess()
         {
+            soundController.PlaySound(SoundType.Block);
             IsBlocking = true;
             blockVfx.SetActive(IsBlocking);
             health.gameObject.SetActive(!IsBlocking);
@@ -163,6 +168,7 @@ public partial class PlayerController : MonoBehaviour
             animator.SetTrigger("Attack");
             hitBox.ActiveDamage(10, 1);
             yield return new WaitForSeconds(0.25f);
+            soundController.PlaySound(SoundType.Attack);
             hitBox.gameObject.SetActive(true);
             hitBox.ShakeObject();
             yield return new WaitForSeconds(0.25f);
@@ -177,6 +183,7 @@ public partial class PlayerController : MonoBehaviour
         StartCoroutine(HurtProcess());
         IEnumerator HurtProcess()
         {
+            soundController.PlaySound(SoundType.Hurt);
             animator.SetTrigger("Hurt");
             yield return new WaitForSeconds(0.2f);
             ChangeState(PlayerStateType.Idle);
@@ -198,7 +205,10 @@ public partial class PlayerController : MonoBehaviour
         }
 
         inputX = Input.GetAxisRaw(InputFactory.GetInputAxisMovement(Player));
-
+        if (inputX != 0 && IsGrounded)
+            soundController.PlayFootStep();
+        else
+            soundController.StopFootStep();
         // Swap direction of sprite depending on walk direction
         if (inputX > 0)
             transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
@@ -216,6 +226,7 @@ public partial class PlayerController : MonoBehaviour
         // Jump
         if (Input.GetKeyDown(InputFactory.GetKeyCode(Player, ActionKey.Jump)) && IsGrounded && (!IsReplaying && !IsDead))
         {
+            soundController.PlaySound(SoundType.Jump);
             animator.SetTrigger("Jump");
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
@@ -248,6 +259,7 @@ public partial class PlayerController : MonoBehaviour
     }
     private void OnDead()
     {
+        soundController.PlaySound(SoundType.Dead);
         IsDead = true;
         health.gameObject.SetActive(false);
         animator.SetTrigger("Death");
@@ -294,6 +306,11 @@ public partial class PlayerController : MonoBehaviour
             IsGrounded = true;
             animator.SetBool("Grounded", IsGrounded);
         }
+
+        if (inputX != 0 && IsGrounded)
+            soundController.PlayFootStep();
+        else
+            soundController.StopFootStep();
         if (inputX > 0)
             transform.localScale = new Vector3(-1.0f, 1.0f, 1.0f);
         else if (inputX < 0)
@@ -328,6 +345,7 @@ public partial class PlayerController : MonoBehaviour
         {
             yield return new WaitForSeconds(0.5f);
             animator.SetInteger("AnimState", (int)AnimState.Idle);
+            soundController.StopFootStep();
         }
     }
 
