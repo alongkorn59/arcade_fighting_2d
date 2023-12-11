@@ -123,12 +123,12 @@ public partial class PlayerController : MonoBehaviour
         {
             soundController.PlaySound(SoundType.Attack);
             animator.SetTrigger("DashAttack");
-            hitBox.ActiveDamage(20, 2);
-            // yield return new WaitForSeconds(0.2f);
             body2d.velocity = Vector2.zero;
+            yield return new WaitForSeconds(0.2f);
+            hitBox.ActiveDamage(20, 2);
             hitBox.gameObject.SetActive(true);
             hitBox.ShakeObject();
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(0.3f);
             hitBox.gameObject.SetActive(false);
             ChangeState(PlayerStateType.Idle);
         }
