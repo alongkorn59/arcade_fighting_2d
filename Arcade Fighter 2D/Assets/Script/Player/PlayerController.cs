@@ -326,6 +326,8 @@ public partial class PlayerController : MonoBehaviour
         // Jump
         if (jump && IsGrounded && !IsDead)
         {
+            soundController.StopFootStep();
+            soundController.PlaySound(SoundType.Jump);
             animator.SetTrigger("Jump");
             IsGrounded = false;
             animator.SetBool("Grounded", IsGrounded);
