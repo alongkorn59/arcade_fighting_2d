@@ -326,7 +326,7 @@ public partial class PlayerController : MonoBehaviour
 
         IEnumerator StopRunningAnimation()
         {
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(0.5f);
             animator.SetInteger("AnimState", (int)AnimState.Idle);
         }
     }
