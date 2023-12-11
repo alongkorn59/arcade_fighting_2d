@@ -51,6 +51,7 @@ public partial class PlayerController : MonoBehaviour
 
     public Action<PlayerType> OnPlayerDead;
     public bool isGameStart = false;
+    private Coroutine idleReplay;
 
     private void Awake()
     {
@@ -84,7 +85,7 @@ public partial class PlayerController : MonoBehaviour
 
     public void Dash()
     {
-        
+
         if (!IsDashing && isDashAble)
             StartCoroutine(DashProcess());
 
@@ -131,7 +132,7 @@ public partial class PlayerController : MonoBehaviour
 
     public void Block()
     {
-        
+
         if (!IsBlocking)
         {
             StartCoroutine(BlockProcess());
@@ -280,9 +281,11 @@ public partial class PlayerController : MonoBehaviour
 
     public void ApplyReplayMovement(float inputX, bool jump) //? Move Jump
     {
+        if (idleReplay != null)
+            StopCoroutine(idleReplay);
         if (jump)
-        if (IsAttacking || IsDashing || IsBlocking)
-            return;
+            if (IsAttacking || IsDashing || IsBlocking)
+                return;
         airSpeed = body2d.velocity.y;
         animator.SetFloat("AirSpeed", airSpeed);
 
@@ -319,7 +322,16 @@ public partial class PlayerController : MonoBehaviour
             animator.SetInteger("AnimState", (int)AnimState.Run);
         else
             animator.SetInteger("AnimState", (int)AnimState.Idle);
+        idleReplay = StartCoroutine(StopRunningAnimation());
+
+        IEnumerator StopRunningAnimation()
+        {
+            yield return new WaitForSeconds(1f);
+            animator.SetInteger("AnimState", (int)AnimState.Idle);
+        }
     }
+
+
 }
 public enum PlayerType
 {
